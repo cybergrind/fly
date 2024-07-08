@@ -9,6 +9,7 @@ import stat
 import struct
 import tempfile
 import time
+from collections import namedtuple
 from pathlib import Path
 
 import fuse
@@ -19,7 +20,6 @@ log = logging.getLogger('fly')
 fuse.fuse_python_api = (0, 2)
 TIME_PAT = re.compile(r'.*\/\d+\.\d+')
 # num files, array[name_length, name]
-HEADER_STRUCT = struct.Struct('I')
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError("your fuse-py doesn't know of fuse.__version__, probably it's too old.")
@@ -93,6 +93,35 @@ class FileWrapper:
         with self.path.open('r+b') as f:
             f.seek(offset)
             f.write(buff)
+
+
+FileRecord = namedtuple('FileRecord', ['name', 'size'])
+
+
+class FileStructure:
+    def __init__(self, structure: bytes):
+        # num_files: int, file_name_length: int, file_name: str, file_size: big int...
+        self.files_list = []
+        if structure:
+            self._parse(structure)
+
+    def _parse(self, structure):
+        (num_files,) = struct.unpack('I', structure[:4])
+        structure = structure[4:]
+        for _ in range(num_files):
+            name_length = struct.unpack('I', structure[:4])[0]
+            structure = structure[4:]
+            name = structure[:name_length].decode()
+            structure = structure[name_length:]
+            size = struct.unpack('Q', structure[:8])[0]
+            structure = structure[8:]
+            self.files_list.append(FileRecord(name, size))
+
+    def pack(self):
+        res = struct.pack('I', len(self.files_list))
+        for name, size in self.files_list:
+            res += struct.pack(f'I{len(name)}sQ', len(name), name.encode(), size)
+        return res
 
 
 class Fly(fuse.Fuse):
