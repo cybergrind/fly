@@ -6,6 +6,8 @@ import multiprocessing
 import os
 import re
 import stat
+import struct
+import tempfile
 import time
 from pathlib import Path
 
@@ -16,6 +18,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s [%(levelname)s] %(n
 log = logging.getLogger('fly')
 fuse.fuse_python_api = (0, 2)
 TIME_PAT = re.compile(r'.*\/\d+\.\d+')
+# num files, array[name_length, name]
+HEADER_STRUCT = struct.Struct('I')
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError("your fuse-py doesn't know of fuse.__version__, probably it's too old.")
@@ -52,11 +56,49 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 
+class FileWrapper:
+    """
+    know how to write to the arbitrary parts of the file
+    """
+
+    def __init__(self, path: Path):
+        self.path = path
+        if not path.exists():
+            path.touch()
+
+        self.inner_files = set()
+
+    def remove_data(self, offset, size):
+        """
+        remove data in file and free space
+        """
+        if offset + size > self.path.stat().st_size:
+            raise ValueError('offset + size > file size')
+        temp = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            with self.path.open('rb') as f:
+                f.seek(0, os.SEEK_SET)
+                temp.write(f.read(offset))
+                f.seek(offset + size, os.SEEK_SET)
+                temp.write(f.read())
+            temp.seek(0)
+            self.path.write_bytes(temp.read())
+        finally:
+            os.unlink(temp.name)
+
+    def write(self, offset, buff):
+        if offset > self.path.stat().st_size:
+            # increase size
+            self.path.write_bytes(b'\0' * (offset - self.path.stat().st_size))
+        with self.path.open('r+b') as f:
+            f.seek(offset)
+            f.write(buff)
+
+
 class Fly(fuse.Fuse):
     def add_args(self, args):
         self._ctime = time.time()
         self._args = args
-        print(f'{args=}')
         self.dst = args.fname
         self.mountpoint = args.mountpoint
 
