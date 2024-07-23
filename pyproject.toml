@@ -13,7 +13,8 @@ select = [
 ]
 ignore = [
   "Q001",
-  "Q003"
+  "Q003",
+  "G004",
 ]
 
 [tool.ruff.format]
@@ -65,3 +66,4 @@ known_first_party = ''
 known_own = ['pytest_tipsi_testing', 'pytest_tipsi_django', 'fan_tools']
 
 #end of black/isort section
+
