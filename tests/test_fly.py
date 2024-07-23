@@ -134,3 +134,13 @@ class TestBasicFly:
 
         fly = Fly()
         fly.add_args(FakeArgs())
+
+        fly.unlink('/new_file2')
+        assert len(fly.fs_structure.files_list) == 0
+        fly.write('/new_file', b'new_file', 0)
+        fly.write('/new_file', b'12345678', 8)
+
+        file1 = fly.fs_structure.files_dict['new_file']
+        assert fly.file_wrapper.read(8, 22) == MAGIC_BYTES
+        assert fly.read('/new_file', 16, 0) == b'new_file12345678'
+        assert fly.file_wrapper.read(8, file1.offset) == b'new_file'
