@@ -38,7 +38,16 @@ def parse_args():
     parser.add_argument('fname', type=lambda x: Path(x).resolve())
     parser.add_argument('mountpoint', nargs='?', default='/tmp/aaa', type=Path)
     parser.add_argument('--ttl', type=int, default=300)
+    parser.add_argument('--debug', action='store_true')
     return parser.parse_args()
+
+
+def update_log_level(level):
+    """
+    update for all existing loggers
+    """
+    for name in logging.Logger.manager.loggerDict:
+        logging.getLogger(name).setLevel(level)
 
 
 def call_fuse_exit(mountpoint):
@@ -256,6 +265,7 @@ class Fly(fuse.Fuse):
         )
         log.debug(f'Original file size: {self.dst.stat().st_size} {base_offset=}')
         self.fs_structure = FileStructure(fs_bytes, base_offset)
+        log.info(f'Init FS with {len(self.fs_structure.files_list)} files')
 
     def getattr(self, path):
         # log.debug(f'getattr {path=}')
@@ -440,8 +450,10 @@ class Fly(fuse.Fuse):
             return -errno.EIO
 
     def truncate(self, path, size):
-        log.debug(f'truncate {path=} {size=}')
-        return -errno.ENOENT
+        """
+        used when you copy over existing file
+        """
+        self.unlink(path)
 
 
 def auto_unmount(mountpoint):
@@ -465,6 +477,10 @@ def mount(args):
 
 def main():
     args = parse_args()
+    if args.debug:
+        update_log_level(logging.DEBUG)
+    else:
+        update_log_level(logging.INFO)
 
     if not args.fname.exists():
         log.error('File %s does not exist', args.fname)
