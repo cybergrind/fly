@@ -298,6 +298,7 @@ class Fly(fuse.Fuse):
         return st
 
     def readdir(self, path, offset):
+        self._ctime = time.time()
         for f in ['.', '..']:
             yield fuse.Direntry(f)
 
@@ -305,10 +306,12 @@ class Fly(fuse.Fuse):
             yield fuse.Direntry(f.name, st_size=f.size)
 
     def rename(self, old, new):
+        self._ctime = time.time()
         log.debug(f'rename {old=} {new=}')
         return -errno.ENOENT
 
     def create(self, path, flags, mode):
+        self._ctime = time.time()
         log.debug(f'create {path=} {flags=}')
         path = path[1:]
         if path in self.fs_structure.files_dict:
@@ -325,6 +328,7 @@ class Fly(fuse.Fuse):
         return 0
 
     def write(self, path, buf, offset):
+        self._ctime = time.time()
         log.debug(f'write {path=} {len(buf)=} {offset=}')
         try:
             path = path[1:]
@@ -359,6 +363,7 @@ class Fly(fuse.Fuse):
             return -errno.EIO
 
     def read(self, path, size, offset):
+        self._ctime = time.time()
         log.debug(f'read {path=} {size=} {offset=}')
         path = path[1:]
         if path not in self.fs_structure.files_dict:
@@ -378,6 +383,7 @@ class Fly(fuse.Fuse):
         return buf
 
     def unlink(self, path):
+        self._ctime = time.time()
         log.debug(f'unlink {path=}')
         try:
             path = path[1:]
@@ -453,7 +459,16 @@ class Fly(fuse.Fuse):
         """
         used when you copy over existing file
         """
+        self._ctime = time.time()
         self.unlink(path)
+
+    # change permissions
+    def chmod(self, path, mode):
+        return 0
+
+    # change owner
+    def chown(self, path, uid, gid):
+        return 0
 
 
 def auto_unmount(mountpoint):
