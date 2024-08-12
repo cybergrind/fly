@@ -471,6 +471,22 @@ class Fly(fuse.Fuse):
         return 0
 
 
+    def rename(self, old, new):
+        self._ctime = time.time()
+        log.debug(f'rename {old=} {new=}')
+        return -errno.ENOENT
+
+    def utime(self, path, times):
+        self._ctime = time.time()
+        log.debug(f'utime {path=} {times=}')
+        return 0
+
+    def utimens(self, path, times=None):
+        self._ctime = time.time()
+        log.debug(f'utimens {path=} {times=}')
+        return 0
+
+
 def auto_unmount(mountpoint):
     """
     wait 10 sec and unmount
